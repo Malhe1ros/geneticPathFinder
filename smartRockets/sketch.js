@@ -15,14 +15,16 @@ var population;
 var death;
 var lifespan = 200;
 var increaseLifespan = 100;
-var increaseEvery = 5;
-var popSize=200;
-var mutationProb=0.01;
+var increaseEvery = 2;
+var elitism = true;
+var popSize=500;
+var mutationProb=0.001;
 var thresh=5;
 var posId=0;
 var circleX = 200
 var circleY = 50;
-var fitness = []
+var fitness = [];
+var threshZero=0.01;
 function createRandomPop(){
   population=new Population();
   for(var i=0;i<popSize;i++){
@@ -32,8 +34,8 @@ function createRandomPop(){
 }
 
 function f(d){
-  if(d<1)return 1e9;
-  return 1e9/(d*d*d);
+  if(d<1)return 1e12;
+  return 1e12/(d*d*d*d);
 }
 function gamb(vx,maxx){
   if(vx<0) vx=0;
@@ -41,8 +43,11 @@ function gamb(vx,maxx){
   return vx;
 }
 
-function fitnessFunction(roc){
+function cost(roc){
   if(roc.hasStopped)return 0;
+  return 1;
+}
+function fitnessFunction(roc){
  
   let v=roc.pos;
   let x1=v.x;
@@ -58,7 +63,7 @@ function fitnessFunction(roc){
     d=wave[fx1][fy1];
     //print(fx1,fy1,d,f(d));
   
-  return f(d);
+  return f(d)*cost(roc);
 
 }
 
@@ -92,19 +97,40 @@ function mergeDNA(r1,r2){
   return r;
 }
 
+function unZero(a){
+  if(a.mag()<threshZero)return p5.Vector.random2D();
+  return a;
+}
+
+function addVector(a,b){
+  return createVector(a.x+b.x,a.y+b.y);
+}
+
 function mutate(){
   if(getRandomFloat(0,1)<mutationProb)return 1;
   return 0;
 }
 var nIteration=0;
+var whichCross = 0;
 function crossover(r1,r2){
   let r = new Rocket();
   let mid=lifespan/2;
-  for(var i=0;i<lifespan;i++){
-    if(mutate()) r.dna.info[i] = p5.Vector.random2D();
-    else if(i<mid) r.dna.info[i]=r1.dna.info[i];
-    else r.dna.info[i]=r2.dna.info[i];
-    r.dna.info[i].setMag(0.1);
+  
+  if(whichCross==0){
+    for(var i=0;i<lifespan;i++){
+      if(mutate()) r.dna.info[i] = p5.Vector.random2D();
+      else if (i<mid) r.dna.info[i]=unZero(r1.dna.info[i]);
+      else r.dna.info[i]=unZero(r2.dna.info[i]);
+      r.dna.info[i].setMag(0.1);
+    }
+  }
+  else{//crossover other version;
+    for(var i=0;i<lifespan;i++){
+      if(mutate()) r.dna.info[i] = p5.Vector.random2D();
+      else r.dna.info[i]=addVector(unZero(r1.dna.info[i]),unZero(r2.dna.info[i]));
+      r.dna.info[i].setMag(0.1);
+    }
+    
   }
   return r;
 
@@ -113,6 +139,7 @@ var bestRocket;
 var toprintX=-1;
 var toPrintY=-1;
 var toPrintR=-1;
+var minAns=0;
 function printCircle(){
   circle(toPrintX,toPrintY,toPrintR);
 }
@@ -131,29 +158,22 @@ function restart(){
       menor=fitness[i];
     }
   }
-  //print("melhor ",melhor,fitness[melhor]);
+  minAns=menor;
   
-  for(var i=0;i<population.rockets.length;i++){
-    
-    /*if(population.rockets[i].hasStopped==false){
-      
-      fill(0,0,256);
-      if(i==melhor)fill(256,0,0);
-      circle(population.rockets[i].pos.x,population.rockets[i].pos.y,20);
-      fill(0,0,256);
-    }*/
-    if(i==melhor){
-      toPrintX=population.rockets[i].pos.x;
-      toPrintY=population.rockets[i].pos.y;
-      toPrintR=20;
-    }
-  }
+  toPrintX=population.rockets[melhor].pos.x;
+  toPrintY=population.rockets[melhor].pos.y;
+  toPrintR=10;
+
   
   for(var i=1;i<popSize;i++){
     fitness[i]+=fitness[i-1];
   }
-  //print(fitness);
-    
+  if(elitism){
+    let theBest = new Rocket();
+    theBest.dna = population.rockets[melhor].dna; 
+
+    newPopulation.add(theBest);
+  }
   while(newPopulation.rockets.length<popSize){
     r1=selectRandom();
     r2=selectRandom();
@@ -227,68 +247,76 @@ function pode(x,y){
   
 function wavefront(){
   wave=[]
- // print(W,H);
   for(var i=0;i<W;i++){
    wave.push([]);
     for(var j=0;j<H;j++){
       wave[i].push(INFINITO);
     }
   }
- // print(wave);
- // print(circleX,circleY);
+
   wave[circleX][circleY]=1;
-  //print(wave);
-  //return;
+
   var queue = createDoubleStackQueue();
   queue.push([circleX,circleY]);
 
-  X=[-1,1];
+  X=[-1,0,1];
   while(!queue.isEmpty()){
     var ans=queue.front();
     let xl=ans[0];
     let yl=ans[1];
     queue.shift();
-    //print(xl,yl);
     for(let dx of X){
-      //print(xl+dx,yl,pode(xl+dx,yl),wave[xl+dx][yl],(1+wave[xl][yl]),!intersects(createVector(xl+dx,yl)));
-      
-      if(pode(xl+dx,yl) && (wave[xl+dx][yl]>(1+wave[xl][yl]))&& (!intersects(createVector(xl+dx,yl)))){
-        //print("ENTREI");
-        wave[xl+dx][yl]=1+wave[xl][yl];
-        queue.push([xl+dx,yl]);
-      }
-      
-      if(pode(xl,yl+dx) && (wave[xl][yl+dx]>(1+wave[xl][yl])) && (!intersects(createVector(xl,yl+dx)))){
-        
-        wave[xl][yl+dx]=1+wave[xl][yl];
-        queue.push([xl,yl+dx]);
+      for(let dy of X){
+        if(pode(xl+dx,yl+dy) && (wave[xl+dx][yl+dy]>(1+wave[xl][yl]))&& (!intersects(createVector(xl+dx,yl+dy)))){
+          wave[xl+dx][yl+dy]=1+wave[xl][yl];
+          queue.push([xl+dx,yl+dy]);
+        }
       }
     }
   }
 
-  //var queue = RapidQueue.createQueue();
-  //print(wave);
-  //noLoop();
+  
+}
+
+var flag=0;
+function torun(){
+  flag=1;
+  popSize = parseInt(document.getElementById("popSiz").value);
+  lifespan = parseInt(document.getElementById("lifesp").value);
+  mutationProb = parseInt(document.getElementById("mutationpro").value);
   
 }
 function setup() {
+
   createCanvas(W,H);
+
   createRandomPop();
   death = new deathZone();
-  death.add(0,100,300,150);
-  death.add(100,300,400,350);
+  death.add(250,200,300,300);
+  death.add(150,140,200,250);
+  death.add(-20,100,300,150);
+  death.add(100,290,410,350);
+  
+  //death add()
   wavefront();
+
+
 }
+
 
 
 var runOnly=false;
 
 
 function draw() {
-  
+ 
+  document.getElementById("tempo").innerHTML = "Tempo"+" = "+posId;
+  document.getElementById("geracao").innerHTML = "Geração"+" = "+nIteration;
+  document.getElementById("melhor").innerHTML = "Melhor"+" = "+minAns;
+
   background(0);
-  
-  if(toPrintR==20){
+  //population.html(posId);
+  if((toPrintR!=-1) && !runOnly){
     push();
       fill(0,0,255);
       printCircle();
@@ -302,8 +330,8 @@ function draw() {
     fill(123,92,0);
     death.draw();
   pop();
-
-  //print(posId);
+  if(flag==0)return;
+  
   if(runOnly){
     bestRocket.update();
     bestRocket.show();
@@ -311,10 +339,8 @@ function draw() {
   }
   else population.update();
   if(posId==lifespan){
-    nIteration++;
-    if(runOnly){
-      noLoop();
-    }
+    
+
     for(var i=0;i<popSize;i++){
       if(population.rockets[i].hasReached==true){
         bestRocket= population.rockets[i];
@@ -327,10 +353,12 @@ function draw() {
         break;
       }
     }
-    //print("tot = ",tot);
     
    
-    if(!runOnly) restart();
+    if(!runOnly) {
+      nIteration++;
+      restart();
+    }
     
     
     posId=0;
@@ -356,7 +384,16 @@ class Population{
     posId++;
   }
   increase(){
-    for(var i=0;i<popSize;i++){
+    var ini=0;
+    if(elitism){
+      ini=1;
+      for(var j=0;j<increaseLifespan;j++){
+        var toad=createVector(0,0);
+        this.rockets[0].dna.info.push(toad);
+      }
+      //print(this.rockets[0]);
+    }
+    for(var i=ini;i<popSize;i++){
       for(var j=0;j<increaseLifespan;j++){
         var toad=p5.Vector.random2D();
         toad.setMag(0.1);
@@ -433,7 +470,13 @@ class Rocket{
     this.hasStopped=false;
   }
   applyForce(force){
-    this.acc.add(force);
+
+    if(force.mag()<threshZero){
+      this.acc=createVector();
+      this.vel=createVector();
+    }
+    else
+     this.acc.add(force);
   } 
   update(){
     

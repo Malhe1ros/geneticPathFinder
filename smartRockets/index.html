@@ -4,21 +4,36 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>p5.js example</title>
+  <title>Smart Rockets</title>
   <style>
     body {
       padding: 0;
       margin: 0;
     }
   </style>
+
+  Enter population size: 
+  <input type="number" id="popSiz" ><br>
+  Enter lifespan: 
+  <input type="number" id="lifesp" ><br>
+  Enter probability of mutation (less than one): 
+  <input type="number" id="mutationpro" ><br>
+  <button onclick="torun()">Start simulation</button>
+
+
+  <p  id="tempo"></p>
+  <p  id="geracao"></p>
+  <p  id="melhor"></p>
+
   <script src="../p5.js"></script>
   <!-- <script src="../addons/p5.sound.js"></script> -->
   <script src="sketch.js"></script>
+ 
 </head>
 
 <body>
   <main>
-    
+
   </main>
 </body>
 
